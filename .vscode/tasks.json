@@ -1,0 +1,93 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+
+    {
+      "label": "🐍 Create Virtual Environment",
+      "type": "shell",
+      "command": "python -m venv .venv",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "📦 Install Dependencies",
+      "type": "shell",
+      "windows": {
+        "command": ".venv\\Scripts\\pip install -r requirements.txt"
+      },
+      "linux": {
+        "command": ".venv/bin/pip install -r requirements.txt"
+      },
+      "osx": {
+        "command": ".venv/bin/pip install -r requirements.txt"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "dependsOn": "🐍 Create Virtual Environment"
+    },
+
+    {
+      "label": "🚀 Run Web Server",
+      "type": "shell",
+      "windows": {
+        "command": ".venv\\Scripts\\python backend\\app.py"
+      },
+      "linux": {
+        "command": ".venv/bin/python backend/app.py"
+      },
+      "osx": {
+        "command": ".venv/bin/python backend/app.py"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting server",
+          "endsPattern": "Running on http"
+        }
+      }
+    },
+
+    {
+      "label": "🧹 Clean outputs",
+      "type": "shell",
+      "windows": {
+        "command": "if exist output_frames del /q output_frames\\* && if exist uploads del /q uploads\\*"
+      },
+      "linux": {
+        "command": "rm -f output_frames/* uploads/*"
+      },
+      "osx": {
+        "command": "rm -f output_frames/* uploads/*"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+
+  ]
+}

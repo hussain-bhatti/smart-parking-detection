@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# VS Code (keep .vscode/ but ignore personal settings)
+.vscode/settings.json.bak
+
+# Project outputs
+uploads/
+output_frames/
+*.mp4
+*.avi
+*.mov
+
+# Keep slots config (it's part of your setup)
+!backend/slots_config.json
+
+# YOLO model weights (large, auto-downloaded)
+*.pt
+*.onnx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,78 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "name": "🚀 Start Web Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/app.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend",
+        "FLASK_ENV": "development",
+        "FLASK_DEBUG": "1"
+      },
+      "justMyCode": false
+    },
+
+    {
+      "name": "🎨 Slot Annotator",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/slot_annotator.py",
+      "args": [
+        "--video", "${input:videoPath}",
+        "--output", "${workspaceFolder}/backend/slots_config.json"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      }
+    },
+
+    {
+      "name": "🎬 Process Video (CLI)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/process_video.py",
+      "args": [
+        "--video",        "${input:videoPath}",
+        "--slots",        "${workspaceFolder}/backend/slots_config.json",
+        "--output-video", "${workspaceFolder}/output_frames/annotated.mp4",
+        "--output-json",  "${workspaceFolder}/output_frames/results.json",
+        "--frame-skip",   "15",
+        "--model",        "n"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      }
+    },
+
+    {
+      "name": "🔍 Debug Detector (single frame test)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/test_detector.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      }
+    }
+
+  ],
+
+  "inputs": [
+    {
+      "id": "videoPath",
+      "type": "promptString",
+      "description": "Path to your parking lot video file",
+      "default": "sample_videos/parking.mp4"
+    }
+  ]
+}

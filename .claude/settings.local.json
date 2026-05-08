@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\hussa\\\\Downloads\\\\parkvision_vscode\\\\parkvision_vscode\" -Recurse -Name)",
+      "Bash(.venv\\\\Scripts\\\\python.exe -c \"import flask, cv2, numpy; print\\('Core deps OK'\\); from ultralytics import YOLO; print\\('YOLO OK'\\)\")"
+    ]
+  }
+}

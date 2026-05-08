@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkVision — Real-Time Parking Detection</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:       #070b12;
+  --bg2:      #0d1117;
+  --bg3:      #131920;
+  --border:   #1e2a38;
+  --text:     #cdd9e5;
+  --muted:    #546478;
+  --free:     #3fb950;
+  --free-bg:  #0d2116;
+  --occ:      #f85149;
+  --occ-bg:   #200d0d;
+  --accent:   #58a6ff;
+  --gold:     #e3b341;
+  --purple:   #bc8cff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 50;
+}
+.logo { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.logo-box {
+  width: 30px; height: 30px; background: var(--accent);
+  border-radius: 6px; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; color: #fff;
+}
+.pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem; padding: 4px 12px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg3);
+  color: var(--muted); display: flex; align-items: center; gap: 6px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.dot.live { background: var(--free); box-shadow: 0 0 8px var(--free); animation: blink 1.8s infinite; }
+.dot.busy { background: var(--gold); box-shadow: 0 0 8px var(--gold); animation: blink .8s infinite; }
+.dot.err  { background: var(--occ); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Layout ── */
+.container { max-width: 1380px; margin: 0 auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+
+/* ── Upload card ── */
+.upload-card {
+  border: 2px dashed var(--border); border-radius: 14px;
+  background: var(--bg2); padding: 40px 24px;
+  text-align: center; cursor: pointer; transition: all .2s;
+  position: relative; overflow: hidden;
+}
+.upload-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(88,166,255,.05) 0%, transparent 65%);
+  pointer-events: none;
+}
+.upload-card:hover, .upload-card.dragover { border-color: var(--accent); background: #0d1520; }
+.upload-card .icon { font-size: 2.8rem; margin-bottom: 12px; }
+.upload-card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+.upload-card p  { color: var(--muted); font-size: .88rem; margin-bottom: 18px; }
+.upload-hint { margin-top: 10px; font-size: .75rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 20px; border-radius: 7px; border: none;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+  font-size: .85rem; cursor: pointer; transition: all .15s;
+}
+.btn-blue  { background: var(--accent); color: #fff; }
+.btn-blue:hover { background: #4295e0; transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-red  { background: var(--occ); color: #fff; }
+.btn-red:hover { background: #d03e38; }
+
+/* ── Main 2-col grid ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1050px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* ── Panel ── */
+.panel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.ph {
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ph h3 { font-size: .85rem; font-weight: 700; }
+.pb { padding: 16px 18px; }
+
+/* ── LIVE stream viewer ── */
+.stream-wrap {
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+}
+.stream-wrap img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.stream-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #000c;
+  color: var(--muted); font-size: .85rem; text-align: center;
+  gap: 10px;
+  transition: opacity .3s;
+}
+.stream-overlay .big { font-size: 2.2rem; }
+.stream-overlay.hidden { opacity: 0; pointer-events: none; }
+
+/* LIVE badge */
+.live-badge {
+  position: absolute; top: 10px; left: 10px;
+  background: var(--occ); color: #fff;
+  font-size: .65rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 1px;
+  display: none;
+}
+.live-badge.show { display: block; animation: blink 1.5s infinite; }
+
+/* ── Progress ── */
+.prog-wrap { background: var(--bg3); border-radius: 20px; height: 5px; overflow: hidden; }
+.prog-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 20px; width: 0%;
+  transition: width .5s ease;
+}
+.prog-row {
+  display: flex; justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: .72rem; color: var(--muted); margin-bottom: 6px;
+}
+
+/* ── Stats row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (max-width: 700px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+
+.stat {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; position: relative;
+}
+.stat .lbl {
+  font-size: .68rem; font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); margin-bottom: 8px;
+}
+.stat .val { font-size: 2rem; font-weight: 700; line-height: 1; }
+.stat .sub { font-size: .72rem; color: var(--muted); margin-top: 3px; }
+.stat.s-free .val    { color: var(--free); }
+.stat.s-occ  .val    { color: var(--occ); }
+.stat.s-total .val   { color: var(--accent); }
+.stat.s-rate  .val   { color: var(--gold); }
+.stat::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px; border-radius: 0 0 10px 10px;
+}
+.stat.s-free::after  { background: var(--free); }
+.stat.s-occ::after   { background: var(--occ); }
+.stat.s-total::after { background: var(--accent); }
+.stat.s-rate::after  { background: var(--gold); }
+
+/* ── Slot grid ── */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 7px;
+}
+.slot-cell {
+  border-radius: 7px; padding: 9px 4px; text-align: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: .75rem;
+  border: 1px solid transparent; transition: all .35s ease;
+}
+.slot-cell.free     { background: var(--free-bg); border-color: var(--free); color: var(--free); }
+.slot-cell.occupied { background: var(--occ-bg);  border-color: var(--occ);  color: var(--occ); }
+.slot-cell.unknown  { background: var(--bg3); border-color: var(--border); color: var(--muted); }
+.slot-cell .sid  { font-size: .8rem; font-weight: 600; display: block; }
+.slot-cell .sst  { font-size: .6rem; opacity: .75; }
+
+/* ── Timeline chart ── */
+.chart-box { height: 130px; }
+canvas { width: 100% !important; height: 100% !important; }
+
+/* ── Summary table ── */
+.sum-table { width: 100%; border-collapse: collapse; }
+.sum-table tr { border-bottom: 1px solid var(--border); }
+.sum-table tr:last-child { border: none; }
+.sum-table td { padding: 9px 2px; font-size: .8rem; vertical-align: middle; }
+.sum-table td:first-child { color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+.sum-table td:last-child  { text-align: right; font-weight: 600; }
+
+/* ── Misc ── */
+.hidden { display: none !important; }
+.fade-in { animation: fadeIn .4s ease forwards; }
+@keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+.tag  { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .68rem; font-family: 'IBM Plex Mono', monospace; border: 1px solid var(--border); color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 24px 10px; font-size: .82rem; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── video complete player ── */
+.video-player { width: 100%; border-radius: 8px; background: #000; display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-box">🅿</div>
+    ParkVision
+  </div>
+  <div class="pill">
+    <div class="dot" id="dot"></div>
+    <span id="hdr-status">connecting…</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ① Upload zone -->
+  <div id="sec-upload">
+    <div class="upload-card" id="drop-zone">
+      <div class="icon">📹</div>
+      <h2>Drop your CCTV parking video</h2>
+      <p>The system will detect free and occupied spaces in real time as the video processes.</p>
+      <input type="file" id="file-input" accept="video/*" style="display:none">
+      <button class="btn btn-blue" onclick="document.getElementById('file-input').click()">
+        📂 Choose Video
+      </button>
+      <div class="upload-hint">MP4 · AVI · MOV · MKV · WEBM &nbsp;|&nbsp; slots auto-detected if no config uploaded</div>
+    </div>
+  </div>
+
+  <!-- ② Live view (shown while processing AND after done) -->
+  <div id="sec-live" class="hidden fade-in">
+
+    <!-- Progress bar -->
+    <div class="panel" id="prog-panel">
+      <div class="ph">
+        <h3 id="prog-title">⏳ Processing…</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="mono" style="font-size:.78rem;color:var(--muted);" id="eta-label"></span>
+          <span class="tag" id="status-tag">queued</span>
+        </div>
+      </div>
+      <div style="padding:14px 18px;">
+        <div class="prog-row">
+          <span id="prog-msg">Initialising…</span>
+          <span id="prog-pct">0%</span>
+        </div>
+        <div class="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- Stats row (live-updating) -->
+    <div class="stats-row">
+      <div class="stat s-free">
+        <div class="lbl">Free Spaces</div>
+        <div class="val" id="s-free">—</div>
+        <div class="sub">available now</div>
+      </div>
+      <div class="stat s-occ">
+        <div class="lbl">Occupied</div>
+        <div class="val" id="s-occ">—</div>
+        <div class="sub">vehicles detected</div>
+      </div>
+      <div class="stat s-total">
+        <div class="lbl">Total Slots</div>
+        <div class="val" id="s-total">—</div>
+        <div class="sub">in parking lot</div>
+      </div>
+      <div class="stat s-rate">
+        <div class="lbl">Occupancy</div>
+        <div class="val" id="s-rate">—</div>
+        <div class="sub">avg over video</div>
+      </div>
+    </div>
+
+    <!-- Main 2-col -->
+    <div class="main-grid">
+
+      <!-- Left column -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Live stream panel -->
+        <div class="panel">
+          <div class="ph">
+            <h3>📡 Live Detection Feed</h3>
+            <div style="display:flex;gap:8px;">
+              <span id="frame-counter" class="tag mono">frame 0</span>
+              <span id="ts-label" class="tag mono">0.0s</span>
+            </div>
+          </div>
+          <div style="padding:14px;">
+            <div class="stream-wrap" id="stream-wrap">
+              <!-- MJPEG stream — src set dynamically -->
+              <img id="live-img" src="" alt="Live detection" style="display:none;">
+              <div class="stream-overlay" id="stream-overlay">
+                <div class="big">📹</div>
+                <div>Waiting for video upload…</div>
+              </div>
+              <div class="live-badge" id="live-badge">● LIVE</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline chart -->
+        <div class="panel">
+          <div class="ph">
+            <h3>📈 Occupancy Timeline</h3>
+            <span class="tag">live</span>
+          </div>
+          <div class="pb">
+            <div class="chart-box"><canvas id="chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Completed video (shown after done) -->
+        <div class="panel hidden" id="panel-video">
+          <div class="ph">
+            <h3>🎬 Full Annotated Video</h3>
+            <a id="dl-video" class="btn btn-ghost" href="#" download style="font-size:.78rem;">⬇ Download</a>
+          </div>
+          <div class="pb">
+            <video id="result-video" class="video-player" controls></video>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Live slot map -->
+        <div class="panel">
+          <div class="ph">
+            <h3>🅿 Slot Map</h3>
+            <div style="display:flex;gap:8px;font-size:.7rem;font-family:'IBM Plex Mono',monospace;">
+              <span style="color:var(--free)">● free</span>
+              <span style="color:var(--occ)">● occ</span>
+            </div>
+          </div>
+          <div class="pb">
+            <div class="slot-grid" id="slot-grid">
+              <div class="empty">Slot data will appear here</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="panel">
+          <div class="ph">
+            <h3>📊 Summary</h3>
+            <a id="dl-json" class="btn btn-ghost" href="#" download style="font-size:.78rem;">⬇ JSON</a>
+          </div>
+          <div class="pb">
+            <table class="sum-table" id="sum-table">
+              <tr><td colspan="2" class="empty">Processing…</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <button class="btn btn-ghost" onclick="reset()" style="width:100%;justify-content:center;">
+          ↩ Analyse Another Video
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let jobId   = null;
+let sse     = null;
+let history = [];   // [{free, occupied}]
+
+// ── API health ────────────────────────────────────────────────────────────────
+async function ping() {
+  try {
+    const r = await fetch('/api/health');
+    if (r.ok) { setDot('live', 'backend online'); }
+  } catch { setDot('err', 'backend offline'); }
+}
+ping();
+
+function setDot(cls, txt) {
+  document.getElementById('dot').className        = 'dot ' + cls;
+  document.getElementById('hdr-status').textContent = txt;
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) upload(f);
+});
+dz.addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) upload(e.target.files[0]);
+});
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+async function upload(file) {
+  const fd = new FormData();
+  fd.append('video', file);
+
+  document.getElementById('sec-upload').classList.add('hidden');
+  document.getElementById('sec-live').classList.remove('hidden');
+  setDot('busy', 'uploading…');
+
+  try {
+    const r  = await fetch('/api/upload', { method: 'POST', body: fd });
+    const js = await r.json();
+    if (!r.ok) throw new Error(js.error || 'Upload failed');
+    jobId = js.job_id;
+    startLiveStream(jobId);
+    startSSE(jobId);
+  } catch (err) {
+    alert('Upload error: ' + err.message);
+    reset();
+  }
+}
+
+// ── MJPEG live stream ─────────────────────────────────────────────────────────
+function startLiveStream(id) {
+  const img     = document.getElementById('live-img');
+  const overlay = document.getElementById('stream-overlay');
+  const badge   = document.getElementById('live-badge');
+
+  img.src = `/api/stream/${id}`;
+  img.style.display = 'block';
+  overlay.classList.add('hidden');
+  badge.classList.add('show');
+
+  img.onerror = () => {
+    // Stream ended (job done) — hide badge, show static placeholder
+    badge.classList.remove('show');
+  };
+}
+
+// ── SSE stats stream ──────────────────────────────────────────────────────────
+function startSSE(id) {
+  if (sse) sse.close();
+  sse = new EventSource(`/api/events/${id}`);
+
+  sse.onmessage = e => {
+    const d = JSON.parse(e.data);
+    updateUI(d);
+    if (d.status === 'done' || d.status === 'error') {
+      sse.close();
+      onJobDone(d);
+    }
+  };
+
+  sse.onerror = () => setDot('err', 'connection lost');
+}
+
+// ── Real-time UI update ───────────────────────────────────────────────────────
+function updateUI(d) {
+  // Header
+  setDot('busy', `${d.progress}% — ${d.status}`);
+
+  // Progress bar
+  document.getElementById('prog-bar').style.width    = d.progress + '%';
+  document.getElementById('prog-pct').textContent    = d.progress + '%';
+  document.getElementById('status-tag').textContent  = d.status;
+  document.getElementById('prog-msg').textContent    =
+    d.status === 'processing' ? `Frame ${d.timestamp_sec?.toFixed(1) ?? 0}s — ETA ${d.eta_sec ?? '…'}s` : d.status;
+  if (d.eta_sec) document.getElementById('eta-label').textContent = `ETA ${d.eta_sec}s`;
+
+  // Counter labels
+  document.getElementById('frame-counter').textContent = `frame ${d.timestamp_sec?.toFixed(1) ?? 0}s`;
+  document.getElementById('ts-label').textContent       = `${d.progress?.toFixed(0)}% done`;
+
+  // Stats cards — update live while processing
+  if (d.free  !== undefined) document.getElementById('s-free').textContent  = d.free;
+  if (d.occupied !== undefined) document.getElementById('s-occ').textContent = d.occupied;
+  if (d.total !== undefined) document.getElementById('s-total').textContent = d.total;
+  const rate = d.total ? Math.round(d.occupied / d.total * 100) : 0;
+  document.getElementById('s-rate').textContent = rate + '%';
+
+  // Slot map
+  if (d.slots && d.slots.length) renderSlotMap(d.slots);
+
+  // Timeline
+  if (d.free !== undefined && d.total !== undefined) {
+    history.push({ free: d.free, occupied: d.occupied });
+    drawChart();
+  }
+}
+
+// ── Job finished ──────────────────────────────────────────────────────────────
+function onJobDone(d) {
+  if (d.status === 'error') {
+    setDot('err', 'error');
+    document.getElementById('prog-title').textContent = '❌ Processing Failed';
+    return;
+  }
+
+  setDot('live', 'done');
+  document.getElementById('prog-title').textContent = '✅ Processing Complete';
+  document.getElementById('live-badge').classList.remove('show');
+
+  // Show final summary
+  const s = d.summary || {};
+  document.getElementById('s-rate').textContent =
+    (s.average_occupancy_rate_pct ?? rate) + '%';
+
+  renderSummary(s);
+
+  // Final slot map
+  const finalSlots = d.slots || s.final_status?.slots || [];
+  if (finalSlots.length) renderSlotMap(finalSlots);
+
+  // Show annotated video + download links
+  document.getElementById('panel-video').classList.remove('hidden');
+  const vid = document.getElementById('result-video');
+  vid.src   = `/api/output/${jobId}/video`;
+  document.getElementById('dl-video').href = `/api/output/${jobId}/video`;
+  document.getElementById('dl-json').href  = `/api/output/${jobId}/json`;
+
+  // Load full frame results for chart
+  fetch(`/api/jobs/${jobId}/frames`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.frame_results) {
+        history = data.frame_results.map(f => ({ free: f.free_slots, occupied: f.occupied_slots }));
+        drawChart();
+      }
+    }).catch(() => {});
+}
+
+// ── Slot map renderer ─────────────────────────────────────────────────────────
+function renderSlotMap(slots) {
+  const grid = document.getElementById('slot-grid');
+  if (!slots.length) { grid.innerHTML = '<div class="empty">No slots</div>'; return; }
+  grid.innerHTML = slots.map(s => `
+    <div class="slot-cell ${s.status}" title="${s.id}: ${s.status} (${s.confidence})">
+      <span class="sid">${s.id}</span>
+      <span class="sst">${s.status === 'free' ? 'free' : 'occ'}</span>
+    </div>
+  `).join('');
+}
+
+// ── Summary table ─────────────────────────────────────────────────────────────
+function renderSummary(s) {
+  const rows = [
+    ['Duration',       `${s.video_duration_sec ?? '—'}s`],
+    ['Frames proc.',   s.total_frames_processed ?? '—'],
+    ['Proc. time',     `${s.processing_time_sec ?? '—'}s`],
+    ['Avg free',       s.average_free_slots ?? '—'],
+    ['Avg occupied',   s.average_occupied_slots ?? '—'],
+    ['Peak occupied',  s.peak_occupied_slots ?? '—'],
+    ['Avg occupancy',  `${s.average_occupancy_rate_pct ?? '—'}%`],
+  ];
+  document.getElementById('sum-table').innerHTML =
+    rows.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function drawChart() {
+  const canvas = document.getElementById('chart');
+  const ctx    = canvas.getContext('2d');
+  const DPR    = window.devicePixelRatio || 1;
+  const CW     = canvas.offsetWidth  * DPR;
+  const CH     = canvas.offsetHeight * DPR;
+  canvas.width  = CW;
+  canvas.height = CH;
+
+  const data = history;
+  if (data.length < 2) return;
+
+  const maxV = Math.max(...data.map(d => d.free + d.occupied), 1);
+  const PAD  = { t: 10*DPR, b: 24*DPR, l: 28*DPR, r: 6*DPR };
+  const W    = CW - PAD.l - PAD.r;
+  const H    = CH - PAD.t - PAD.b;
+
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Grid
+  ctx.strokeStyle = '#1e2a38'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.t + H/4*i;
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(CW-PAD.r, y); ctx.stroke();
+    ctx.fillStyle = '#546478'; ctx.font = `${9*DPR}px IBM Plex Mono`;
+    ctx.fillText(Math.round(maxV*(1-i/4)), 2, y+3);
+  }
+
+  const xStep = W / (data.length - 1);
+
+  const fill = (key, color) => {
+    ctx.beginPath(); ctx.fillStyle = color; ctx.globalAlpha = .14;
+    data.forEach((d,i) => {
+      const x = PAD.l + i*xStep, y = PAD.t + H - (d[key]/maxV)*H;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.lineTo(PAD.l + (data.length-1)*xStep, PAD.t+H);
+    ctx.lineTo(PAD.l, PAD.t+H); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+  };
+
+  const line = (key, color) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.8*DPR; ctx.lineJoin = 'round';
+    data.forEach((d,i) => {
+      const x = PAD.l + i*xStep, y = PAD.t + H - (d[key]/maxV)*H;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  };
+
+  fill('free',     '#3fb950'); line('free',     '#3fb950');
+  fill('occupied', '#f85149'); line('occupied', '#f85149');
+
+  // Legend
+  ctx.font = `${9*DPR}px IBM Plex Mono`;
+  ctx.fillStyle='#3fb950'; ctx.fillRect(PAD.l,   CH-PAD.b+6*DPR, 8*DPR, 8*DPR);
+  ctx.fillStyle=var_text(); ctx.fillText('Free',    PAD.l+12*DPR, CH-PAD.b+14*DPR);
+  ctx.fillStyle='#f85149'; ctx.fillRect(PAD.l+55*DPR, CH-PAD.b+6*DPR, 8*DPR, 8*DPR);
+  ctx.fillStyle=var_text(); ctx.fillText('Occupied', PAD.l+68*DPR, CH-PAD.b+14*DPR);
+
+  // X labels (time marks)
+  ctx.fillStyle = '#546478';
+  const ticks = Math.min(5, data.length-1);
+  for (let i = 0; i <= ticks; i++) {
+    const idx = Math.round((data.length-1)*i/ticks);
+    const x   = PAD.l + idx * xStep;
+    ctx.fillText(`${idx}`, x-6, CH-3);
+  }
+}
+function var_text() { return '#cdd9e5'; }
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function reset() {
+  if (sse) { sse.close(); sse = null; }
+  jobId   = null;
+  history = [];
+
+  // Reset stream
+  const img = document.getElementById('live-img');
+  img.src = ''; img.style.display = 'none';
+  document.getElementById('stream-overlay').classList.remove('hidden');
+  document.getElementById('live-badge').classList.remove('show');
+
+  // Reset stats
+  ['s-free','s-occ','s-total','s-rate'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('prog-bar').style.width = '0%';
+  document.getElementById('prog-pct').textContent = '0%';
+  document.getElementById('prog-title').textContent = '⏳ Processing…';
+  document.getElementById('slot-grid').innerHTML = '<div class="empty">Slot data will appear here</div>';
+  document.getElementById('sum-table').innerHTML = '<tr><td colspan="2" class="empty">Processing…</td></tr>';
+  document.getElementById('panel-video').classList.add('hidden');
+  document.getElementById('result-video').src = '';
+
+  document.getElementById('sec-upload').classList.remove('hidden');
+  document.getElementById('sec-live').classList.add('hidden');
+  document.getElementById('file-input').value = '';
+  setDot('live', 'backend online');
+}
+</script>
+</body>
+</html>
